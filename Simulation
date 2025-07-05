@@ -1,0 +1,435 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import random
+
+class DSCOVR3DMolecular:
+    def __init__(self):
+        # System parameters
+        self.signal_range = (0, 3072)
+        self.voltage_range = (0, 63)
+        self.spectrum_length_range = (19, 64)
+        self.faces_per_molecule = 54  # 6x9 configuration
+        
+        # Composition parameters
+        self.h2o3_percentage = 0.80
+        self.gas_percentage = 0.20
+        self.electric_charge_percentage = 0.20
+        
+        # Ketone molecular analysis parameters
+        self.ketone_library = {
+            'acetone': {'formula': 'C3H6O', 'type': 'solvent', 'bond_angle': 120.0},
+            'oxaloacetate': {'formula': 'C4H4O5', 'type': 'metabolic_intermediate', 'bond_angle': 120.0},
+            'acetylacetone': {'formula': 'C5H8O2', 'type': 'enol_form', 'bond_angle': 120.0},
+            'cyclohexanone': {'formula': 'C6H10O', 'type': 'nylon_precursor', 'bond_angle': 120.0},
+            'muscone': {'formula': 'C16H30O', 'type': 'animal_scent', 'bond_angle': 120.0},
+            'tetracycline': {'formula': 'C22H24N2O8', 'type': 'antibiotic', 'bond_angle': 120.0}
+        }
+        
+        # Ketone structural properties
+        self.ketone_properties = {
+            'hybridization': 'sp2',
+            'geometry': 'trigonal_planar',
+            'bond_angles': {'C_C_O': 120.0, 'C_C_C': 120.0},
+            'carbonyl_bonding': 'two_carbons',  # distinguishes from aldehydes
+            'functional_group': 'C=O'
+        }
+        
+        # Adrenal gland vertebrae cathode system
+        self.adrenal_cathode_system = {
+            'vertebrae_cathodes': ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'],
+            'vibration_frequencies': np.linspace(0.5, 15.0, 7),  # Hz range for vertebrae
+            'adrenal_coupling': {
+                'left_gland': {'vertebrae': ['C1', 'C3', 'C5'], 'phase_offset': 0},
+                'right_gland': {'vertebrae': ['C2', 'C4', 'C6'], 'phase_offset': np.pi/4}
+            },
+            'cathode_voltage_range': (0, 127),  # Enhanced range for adrenal system
+            'cell_mobility_threshold': 0.3
+        }
+        
+        # Sensor arrays
+        self.sensors = {
+            'A3': 'H2O3_detection',
+            'B3': 'gas_phase_measurement',
+            'C3': 'electric_charge_capture'
+        }
+        
+    def generate_voltage_sequence(self):
+        """Generate ascending voltage sequence for one spectrum"""
+        length = random.randint(*self.spectrum_length_range)
+        return np.linspace(0, 63, length)
+    
+    def detect_ketone_signatures(self, measurements):
+        """Detect ketone molecular signatures in vapor cell measurements"""
+        ketone_detections = {}
+        
+        for ketone_name, properties in self.ketone_library.items():
+            # Simulate ketone detection based on molecular signature
+            # Each ketone has unique spectral fingerprint in H2O3 environment
+            signature_strength = 0
+            
+            # Analyze A3 sensor data for ketone-H2O3 interactions
+            h2o3_signals = measurements['A3']
+            
+            if ketone_name == 'acetone':
+                # Acetone shows strong interaction with H2O3 at mid-range voltages
+                signature_strength = np.mean(h2o3_signals[len(h2o3_signals)//3:2*len(h2o3_signals)//3])
+            elif ketone_name == 'oxaloacetate':
+                # Metabolic intermediate shows complex pattern
+                signature_strength = np.std(h2o3_signals) * 2
+            elif ketone_name == 'acetylacetone':
+                # Enol form shows unique resonance pattern
+                signature_strength = np.max(h2o3_signals) - np.mean(h2o3_signals)
+            elif ketone_name == 'cyclohexanone':
+                # Cyclic structure shows stable signature
+                signature_strength = np.mean(h2o3_signals[-10:])  # Strong in high voltage range
+            elif ketone_name == 'muscone':
+                # Large molecule shows broad signature
+                signature_strength = np.trapz(h2o3_signals) / len(h2o3_signals)
+            elif ketone_name == 'tetracycline':
+                # Antibiotic shows complex multi-peak signature
+                signature_strength = np.var(h2o3_signals)
+            
+            # Normalize to detection probability
+            detection_probability = min(signature_strength / 3000.0, 1.0)
+            
+            ketone_detections[ketone_name] = {
+                'probability': detection_probability,
+                'signature_strength': signature_strength,
+                'molecular_formula': properties['formula'],
+                'functional_type': properties['type'],
+                'sp2_hybridized': True,
+                'trigonal_planar': True,
+                'bond_angle_C_C_O': properties['bond_angle']
+            }
+        
+        return ketone_detections
+    
+    def analyze_carbonyl_geometry(self, ketone_detections):
+        """Analyze ketone carbonyl geometry and bonding patterns"""
+        geometry_analysis = {
+            'detected_ketones': [],
+            'sp2_hybridization_confirmed': 0,
+            'trigonal_planar_geometry': 0,
+            'carbonyl_c_c_bonds': 0,  # Ketones: C=O bonded to 2 carbons
+            'average_bond_angle': 120.0
+        }
+        
+        for ketone_name, detection in ketone_detections.items():
+            if detection['probability'] > 0.3:  # Significant detection threshold
+                geometry_analysis['detected_ketones'].append(ketone_name)
+                geometry_analysis['sp2_hybridization_confirmed'] += 1
+                geometry_analysis['trigonal_planar_geometry'] += 1
+                geometry_analysis['carbonyl_c_c_bonds'] += 2  # Each ketone has 2 C-C bonds to carbonyl
+        
+        return geometry_analysis
+    
+    def simulate_vertebrae_cathode_vibration(self, vertebrae_id, time_points=100):
+        """Simulate vibration patterns of vertebrae cathodes in adrenal glands"""
+        vertebrae_index = int(vertebrae_id[1]) - 1  # C1=0, C2=1, etc.
+        base_frequency = self.adrenal_cathode_system['vibration_frequencies'][vertebrae_index]
+        
+        # Determine adrenal gland coupling
+        left_gland = vertebrae_id in self.adrenal_cathode_system['adrenal_coupling']['left_gland']['vertebrae']
+        right_gland = vertebrae_id in self.adrenal_cathode_system['adrenal_coupling']['right_gland']['vertebrae']
+        
+        time = np.linspace(0, 2, time_points)
+        
+        # Base vibration pattern
+        vibration = np.sin(2 * np.pi * base_frequency * time)
+        
+        # Add adrenal gland modulation
+        if left_gland:
+            phase_offset = self.adrenal_cathode_system['adrenal_coupling']['left_gland']['phase_offset']
+            adrenal_modulation = 0.3 * np.sin(2 * np.pi * 0.8 * time + phase_offset)
+            vibration += adrenal_modulation
+        elif right_gland:
+            phase_offset = self.adrenal_cathode_system['adrenal_coupling']['right_gland']['phase_offset']
+            adrenal_modulation = 0.3 * np.sin(2 * np.pi * 0.8 * time + phase_offset)
+            vibration += adrenal_modulation
+        
+        # Cathode electrical component
+        cathode_voltage = (vibration + 1) * 63.5  # Scale to cathode voltage range
+        
+        return {
+            'time': time,
+            'vibration_amplitude': vibration,
+            'cathode_voltage': cathode_voltage,
+            'frequency': base_frequency,
+            'adrenal_coupled': left_gland or right_gland,
+            'gland_side': 'left' if left_gland else ('right' if right_gland else 'none')
+        }
+    
+    def calculate_cell_shift_dynamics(self, vibration_data, cell_position):
+        """Calculate how cells shift based on vertebrae cathode vibrations"""
+        vibration_amplitude = vibration_data['vibration_amplitude']
+        cathode_voltage = vibration_data['cathode_voltage']
+        
+        # Cell shift magnitude based on vibration strength
+        shift_magnitude = np.abs(vibration_amplitude) * 0.5
+        
+        # Direction of shift influenced by cathode voltage gradient
+        voltage_gradient = np.gradient(cathode_voltage)
+        shift_direction = np.sign(voltage_gradient)
+        
+        # Calculate new cell positions
+        base_x, base_y, base_z = cell_position
+        
+        cell_trajectory = {
+            'x_position': base_x + shift_magnitude * shift_direction * 0.1,
+            'y_position': base_y + shift_magnitude * np.cos(vibration_amplitude) * 0.1,
+            'z_position': base_z + shift_magnitude * np.sin(vibration_amplitude) * 0.1,
+            'mobility_index': np.mean(shift_magnitude),
+            'vibration_response': shift_magnitude,
+            'cathode_influence': np.mean(np.abs(voltage_gradient))
+        }
+        
+        return cell_trajectory
+        """Simulate measurement of A or B vapor cell in C vertebrae"""
+        voltages = self.generate_voltage_sequence()
+        measurements = {}
+        
+        for sensor, function in self.sensors.items():
+            if sensor == 'A3':  # H2O3 detection
+                base_signal = np.random.normal(2400, 200, len(voltages))  # High signal for 80% H2O3
+                noise = np.random.normal(0, 50, len(voltages))
+                measurements[sensor] = np.clip(base_signal + noise, *self.signal_range)
+                
+            elif sensor == 'B3':  # Gas phase measurement
+                base_signal = np.random.normal(600, 100, len(voltages))  # Lower signal for 20% gas
+                noise = np.random.normal(0, 30, len(voltages))
+                measurements[sensor] = np.clip(base_signal + noise, *self.signal_range)
+                
+            elif sensor == 'C3':  # Electric charge capture
+                # Electric charge varies with voltage
+                charge_signal = voltages * 30 + np.random.normal(0, 40, len(voltages))
+                measurements[sensor] = np.clip(charge_signal, *self.signal_range)
+        
+        return {
+            'voltages': voltages,
+            'measurements': measurements,
+            'cell_type': cell_type,
+            'vertebrae_id': vertebrae_id,
+            'face_id': face_id
+        }
+    
+    def scan_vertebrae(self, vertebrae_id, num_cells=10):
+        """Complete scan of C vertebrae containing A and B vapor cells with cathode vibration analysis"""
+        vertebrae_data = []
+        
+        # Get vertebrae cathode vibration pattern
+        vibration_data = self.simulate_vertebrae_cathode_vibration(vertebrae_id)
+        
+        print(f"=== Scanning Vertebrae {vertebrae_id} ===")
+        print(f"Cathode frequency: {vibration_data['frequency']:.2f} Hz")
+        print(f"Adrenal coupling: {vibration_data['adrenal_coupled']} ({vibration_data['gland_side']} gland)")
+        print(f"Average cathode voltage: {np.mean(vibration_data['cathode_voltage']):.1f}V")
+        print()
+        
+        for cell_idx in range(num_cells):
+            cell_type = 'A' if random.random() < 0.6 else 'B'  # 60% A cells, 40% B cells
+            
+            # Initial cell position
+            cell_position = (random.uniform(-5, 5), random.uniform(-5, 5), random.uniform(-2, 2))
+            
+            # Calculate cell movement due to vibration
+            cell_trajectory = self.calculate_cell_shift_dynamics(vibration_data, cell_position)
+            
+            # Measure all 54 faces for this cell with vibration influence
+            cell_data = []
+            current_vibration = vibration_data['vibration_amplitude'][cell_idx % len(vibration_data['vibration_amplitude'])]
+            
+            for face in range(self.faces_per_molecule):
+                face_measurement = self.measure_vapor_cell(cell_type, vertebrae_id, face, current_vibration)
+                cell_data.append(face_measurement)
+            
+            vertebrae_data.append({
+                'cell_type': cell_type,
+                'cell_id': cell_idx,
+                'face_measurements': cell_data,
+                'initial_position': cell_position,
+                'cell_trajectory': cell_trajectory,
+                'vibration_response': cell_trajectory['mobility_index'],
+                'cathode_coupling_strength': cell_trajectory['cathode_influence']
+            })
+        
+        return vertebrae_data, vibration_data
+    
+    def analyze_composition(self, vertebrae_data):
+        """Analyze the H2O3/Gas/Electric composition from measurements"""
+        h2o3_signals = []
+        gas_signals = []
+        electric_signals = []
+        
+        for cell in vertebrae_data:
+            for face_data in cell['face_measurements']:
+                h2o3_signals.extend(face_data['measurements']['A3'])
+                gas_signals.extend(face_data['measurements']['B3'])
+                electric_signals.extend(face_data['measurements']['C3'])
+        
+        return {
+            'h2o3_mean': np.mean(h2o3_signals),
+            'h2o3_std': np.std(h2o3_signals),
+            'gas_mean': np.mean(gas_signals),
+            'gas_std': np.std(gas_signals),
+            'electric_mean': np.mean(electric_signals),
+            'electric_std': np.std(electric_signals),
+            'total_measurements': len(h2o3_signals)
+        }
+    
+    def visualize_3d_measurements(self, vertebrae_data):
+        """Create 3D visualization of vapor cell measurements"""
+        fig = plt.figure(figsize=(15, 5))
+        
+        # Plot 1: H2O3 (A3 sensor) measurements
+        ax1 = fig.add_subplot(131, projection='3d')
+        x, y, z = [], [], []
+        colors = []
+        
+        for cell in vertebrae_data[:3]:  # First 3 cells for visualization
+            for face_idx, face_data in enumerate(cell['face_measurements'][:18]):  # First 18 faces
+                face_x = face_idx % 6
+                face_y = face_idx // 6
+                face_z = np.mean(face_data['measurements']['A3'])
+                
+                x.append(face_x)
+                y.append(face_y)
+                z.append(face_z)
+                colors.append('red' if cell['cell_type'] == 'A' else 'blue')
+        
+        ax1.scatter(x, y, z, c=colors, alpha=0.6)
+        ax1.set_title('H2O3 Detection (A3 Sensor)')
+        ax1.set_xlabel('X Face')
+        ax1.set_ylabel('Y Face')
+        ax1.set_zlabel('Signal Strength')
+        
+        # Plot 2: Gas Phase (B3 sensor) measurements
+        ax2 = fig.add_subplot(132, projection='3d')
+        z_gas = []
+        for cell in vertebrae_data[:3]:
+            for face_idx, face_data in enumerate(cell['face_measurements'][:18]):
+                z_gas.append(np.mean(face_data['measurements']['B3']))
+        
+        ax2.scatter(x, y, z_gas, c=colors, alpha=0.6)
+        ax2.set_title('Gas Phase (B3 Sensor)')
+        ax2.set_xlabel('X Face')
+        ax2.set_ylabel('Y Face')
+        ax2.set_zlabel('Signal Strength')
+        
+        # Plot 3: Electric Charge (C3 sensor) measurements
+        ax3 = fig.add_subplot(133, projection='3d')
+        z_electric = []
+        for cell in vertebrae_data[:3]:
+            for face_idx, face_data in enumerate(cell['face_measurements'][:18]):
+                z_electric.append(np.mean(face_data['measurements']['C3']))
+        
+        ax3.scatter(x, y, z_electric, c=colors, alpha=0.6)
+        ax3.set_title('Electric Charge (C3 Sensor)')
+        ax3.set_xlabel('X Face')
+        ax3.set_ylabel('Y Face')
+        ax3.set_zlabel('Signal Strength')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def run_full_analysis(self):
+        """Run complete DSCOVR 3D molecular analysis"""
+        print("=== DSCOVR 3D Molecular Vapor Cell Analysis ===")
+        print("Analyzing A and B vapor cells in C vertebrae structure")
+        print("Vertebrae cathodes coupled to adrenal glands - cells shift based on vibration")
+        print(f"Composition: {self.h2o3_percentage*100}% H2O3, {self.gas_percentage*100}% Gas, {self.electric_charge_percentage*100}% Electric")
+        print()
+        
+        # Scan vertebrae with vibration analysis
+        vertebrae_data, vibration_data = self.scan_vertebrae("C3", num_cells=8)  # C3 has strong adrenal coupling
+        
+        # Analyze composition
+        composition = self.analyze_composition(vertebrae_data)
+        
+        print("=== Analysis Results ===")
+        print(f"H2O3 Signal - Mean: {composition['h2o3_mean']:.1f}, Std: {composition['h2o3_std']:.1f}")
+        print(f"Gas Signal - Mean: {composition['gas_mean']:.1f}, Std: {composition['gas_std']:.1f}")
+        print(f"Electric Signal - Mean: {composition['electric_mean']:.1f}, Std: {composition['electric_std']:.1f}")
+        print(f"Total Measurements: {composition['total_measurements']}")
+        print()
+        
+        # Ketone analysis
+        print("=== Ketone Molecular Analysis ===")
+        print("Representative ketones detected in vapor cells:")
+        print("- Acetone: common solvent")
+        print("- Oxaloacetate: intermediate in sugar metabolism") 
+        print("- Acetylacetone: in enol form (enol highlighted)")
+        print("- Cyclohexanone: precursor to nylon")
+        print("- Muscone: animal scent compound")
+        print("- Tetracycline: antibiotic")
+        print()
+        
+        # Analyze ketone signatures from first cell
+        if vertebrae_data:
+            sample_measurements = vertebrae_data[0]['face_measurements'][0]['measurements']
+            ketone_detections = self.detect_ketone_signatures(sample_measurements)
+            geometry_analysis = self.analyze_carbonyl_geometry(ketone_detections)
+            
+            print("=== Ketone Detection Results ===")
+            for ketone, detection in ketone_detections.items():
+                if detection['probability'] > 0.2:
+                    print(f"{ketone.title()}: {detection['probability']:.2f} probability")
+                    print(f"  Formula: {detection['molecular_formula']}")
+                    print(f"  Type: {detection['functional_type']}")
+                    print(f"  sp2 hybridized: {detection['sp2_hybridized']}")
+                    print(f"  Trigonal planar: {detection['trigonal_planar']}")
+                    print(f"  C-C-O bond angle: {detection['bond_angle_C_C_O']:.1f}°")
+            print()
+            
+            print("=== Carbonyl Geometry Analysis ===")
+            print(f"Ketones detected: {len(geometry_analysis['detected_ketones'])}")
+            print(f"sp2 hybridization confirmed: {geometry_analysis['sp2_hybridization_confirmed']} instances")
+            print(f"Trigonal planar geometry: {geometry_analysis['trigonal_planar_geometry']} instances")
+            print(f"Carbonyl C-C bonds: {geometry_analysis['carbonyl_c_c_bonds']} (ketones have C=O bonded to 2 carbons)")
+            print(f"Average bond angle: {geometry_analysis['average_bond_angle']:.1f}° (distinguishes from aldehydes)")
+            print("Note: Ketones differ from aldehydes - carbonyl bonded to 2 carbons vs 1 carbon + 1 hydrogen")
+            print()
+        
+        # Vertebrae cathode and cell movement analysis
+        print("=== Vertebrae Cathode Vibration Analysis ===")
+        print(f"Vibration frequency: {vibration_data['frequency']:.2f} Hz")
+        print(f"Adrenal gland coupling: {vibration_data['gland_side']} side")
+        print(f"Cathode voltage range: {np.min(vibration_data['cathode_voltage']):.1f} - {np.max(vibration_data['cathode_voltage']):.1f}V")
+        print()
+        
+        print("=== Cell Movement Dynamics ===")
+        total_mobility = 0
+        high_mobility_cells = 0
+        
+        for cell in vertebrae_data:
+            mobility = cell['vibration_response']
+            total_mobility += mobility
+            if mobility > self.adrenal_cathode_system['cell_mobility_threshold']:
+                high_mobility_cells += 1
+            
+            print(f"Cell {cell['cell_id']} ({cell['cell_type']}-type):")
+            print(f"  Initial position: ({cell['initial_position'][0]:.2f}, {cell['initial_position'][1]:.2f}, {cell['initial_position'][2]:.2f})")
+            print(f"  Mobility index: {mobility:.3f}")
+            print(f"  Cathode coupling: {cell['cathode_coupling_strength']:.2f}")
+            print(f"  Movement response: {'High' if mobility > self.adrenal_cathode_system['cell_mobility_threshold'] else 'Moderate'}")
+        
+        print(f"\nAverage cell mobility: {total_mobility/len(vertebrae_data):.3f}")
+        print(f"High mobility cells: {high_mobility_cells}/{len(vertebrae_data)}")
+        print("Cell shifting driven by vertebrae cathode vibrations coupled to adrenal gland activity")
+        print()
+        
+        # Cell type distribution
+        a_cells = sum(1 for cell in vertebrae_data if cell['cell_type'] == 'A')
+        b_cells = sum(1 for cell in vertebrae_data if cell['cell_type'] == 'B')
+        print(f"Cell Distribution: {a_cells} A-type cells, {b_cells} B-type cells")
+        print()
+        
+        # Visualize results
+        self.visualize_3d_measurements(vertebrae_data)
+        
+        return vertebrae_data, composition
+
+# Run the analysis
+if __name__ == "__main__":
+    dscovr = DSCOVR3DMolecular()
+    vertebrae_data, composition_results = dscovr.run_full_analysis()
