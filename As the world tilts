@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Harmonic Simulator — Satellites Integrated</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --bg:#071026; --panel:#0f1624; --glass:rgba(255,255,255,.04);
+    --accent1:#ff6b6b; --accent2:#4ecdc4; --gold:#f6c945;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; padding:12px; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    background: radial-gradient(1000px 400px at 50% -10%, #071026 0%, #02040a 50%), #000;
+    color:#eaf2ff; display:flex; flex-direction:column; align-items:center; gap:12px;
+  }
+  h1{ margin:0; font-size:1.4rem; background:linear-gradient(90deg,var(--accent1),var(--accent2)); -webkit-background-clip:text; color:transparent; }
+  .subtitle{ margin-top:-6px; opacity:.8; font-size:0.95rem; max-width:1100px; text-align:center }
+  #stage{ width:min(1100px,96vw); height:min(64vh,640px); background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02)); border-radius:12px; border:1px solid rgba(255,255,255,.08); box-shadow:0 18px 40px rgba(0,0,0,.6) }
+  .panel{ width:min(1100px,96vw); display:grid; grid-template-columns: 1fr; gap:10px }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center }
+  .group{ flex:1 1 320px; background:var(--glass); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.08) }
+  label{ font-weight:700; font-size:0.9rem }
+  input[type="range"]{ width:160px }
+  .eq-wrap{ display:flex; gap:8px; align-items:flex-end; padding:8px; border-radius:10px; overflow:auto; }
+  .eq{ display:flex; flex-direction:column; align-items:center; gap:6px; min-width:42px }
+  .bar{ width:22px; height:130px; border-radius:10px; background:linear-gradient(180deg,#111422,#0b1018); border:1px solid rgba(255,255,255,.08); position:relative; overflow:hidden }
+  .fill{ position:absolute; left:0; bottom:0; width:100%; height:0% }
+  .bass .fill{ background:linear-gradient(180deg, rgba(86,211,100,.9), rgba(86,211,100,.15)) }
+  .mid  .fill{ background:linear-gradient(180deg, rgba(255,217,102,.95), rgba(255,217,102,.2)) }
+  .treb .fill{ background:linear-gradient(180deg, rgba(96,168,255,.95), rgba(96,168,255,.2)) }
+  .label{ font-size:0.8rem; opacity:.9 }
+  .controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+  .chip{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); font-size:0.85rem }
+  .readout{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight:700; font-size:0.92rem }
+  .small{ font-size:0.82rem; opacity:.8 }
+  .footer-note{ max-width:1100px; opacity:.75; font-size:0.88rem; text-align:center }
+  @media (max-width:760px){ .group{ min-width:220px } }
+</style>
+</head>
+<body>
+  <h1>Harmonic Simulator — Satellites Integrated</h1>
+  <div class="subtitle">Equalizer-driven harmonic field + spiral octaves + cylindrical multipoles. Satellites pulse/beam and transiently inject energy into bands; epicycle/deferent coil logic modulates frequency via ring geometry.</div>
+
+  <canvas id="stage"></canvas>
+
+  <div class="panel">
+    <div class="row">
+      <div class="group">
+        <label>Wave / Harmonic Controls</label>
+        <div class="controls" style="margin-top:8px">
+          <div>
+            <small class="small">k (wave number)</small><br>
+            <input id="k" type="range" min="0.004" max="0.03" step="0.001" value="0.012"><div id="kv" class="readout">0.012</div>
+          </div>
+          <div>
+            <small class="small">ω (angular speed)</small><br>
+            <input id="omega" type="range" min="0.3" max="4" step="0.1" value="1.4"><div id="ov" class="readout">1.4</div>
+          </div>
+          <div>
+            <small class="small">φ (phase)</small><br>
+            <input id="phi" type="range" min="-3.1416" max="3.1416" step="0.01" value="0"><div id="phv" class="readout">0.00</div>
+          </div>
+          <div>
+            <small class="small">Polarity (− ↔ +)</small><br>
+            <input id="polarity" type="range" min="-1" max="1" step="0.01" value="0"><div id="polv" class="readout">0.00</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start">
+            <label class="chip"><input id="mirror" type="checkbox"> Antimatter Mirror (invert phase)</label>
+            <label class="chip"><input id="animateBars" type="checkbox" checked> Animate EQ Bars</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Equalizer (10 bands → integer harmonics)</label>
+        <div id="eqWrap" class="eq-wrap" style="margin-top:10px">
+          <!-- Bass 1-3 -->
+          <div class="eq bass"><div class="bar"><div class="fill" id="f0"></div><input id="eq0" type="range" min="0" max="100" value="55"></div><div class="label">1</div></div>
+          <div class="eq bass"><div class="bar"><div class="fill" id="f1"></div><input id="eq1" type="range" min="0" max="100" value="65"></div><div class="label">2</div></div>
+          <div class="eq bass"><div class="bar"><div class="fill" id="f2"></div><input id="eq2" type="range" min="0" max="100" value="45"></div><div class="label">3</div></div>
+          <!-- Mid 4-7 -->
+          <div class="eq mid"><div class="bar"><div class="fill" id="f3"></div><input id="eq3" type="range" min="0" max="100" value="35"></div><div class="label">4</div></div>
+          <div class="eq mid"><div class="bar"><div class="fill" id="f4"></div><input id="eq4" type="range" min="0" max="100" value="30"></div><div class="label">5</div></div>
+          <div class="eq mid"><div class="bar"><div class="fill" id="f5"></div><input id="eq5" type="range" min="0" max="100" value="25"></div><div class="label">6</div></div>
+          <div class="eq mid"><div class="bar"><div class="fill" id="f6"></div><input id="eq6" type="range" min="0" max="100" value="20"></div><div class="label">7</div></div>
+          <!-- Treble 8-10 -->
+          <div class="eq treb"><div class="bar"><div class="fill" id="f7"></div><input id="eq7" type="range" min="0" max="100" value="35"></div><div class="label">8</div></div>
+          <div class="eq treb"><div class="bar"><div class="fill" id="f8"></div><input id="eq8" type="range" min="0" max="100" value="40"></div><div class="label">9</div></div>
+          <div class="eq treb"><div class="bar"><div class="fill" id="f9"></div><input id="eq9" type="range" min="0" max="100" value="50"></div><div class="label">10</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multipole + Satellite controls -->
+    <div class="row">
+      <div class="group">
+        <label>Exterior Multipoles (DNA-like)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap; margin-top:8px">
+          <div><small>Q₁</small><br><input id="Q1" type="range" min="-3" max="3" step="0.1" value="1.0"><div id="Q1v" class="readout">1.0</div></div>
+          <div><small>ε</small><br><input id="eps" type="range" min="0.2" max="5" step="0.1" value="1.0"><div id="epsv" class="readout">1.0</div></div>
+          <div><small>kₘₐₓ</small><br><input id="kmax" type="range" min="1" max="10" step="1" value="6"><div id="kmaxv" class="readout">6</div></div>
+        </div>
+        <div id="multislots" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      </div>
+
+      <div class="group">
+        <label>Interior λ(ρ,θ) (protein-like)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <div><small>ρc</small><br><input id="rhoC" type="range" min="10" max="260" step="1" value="120"><div id="rhoCv" class="readout">120</div></div>
+          <div><small>θc (rad)</small><br><input id="thetaC" type="range" min="-3.1416" max="3.1416" step="0.01" value="0"><div id="thetaCv" class="readout">0.00</div></div>
+          <div><small>σρ</small><br><input id="sigR" type="range" min="5" max="120" step="1" value="60"><div id="sigRv" class="readout">60</div></div>
+          <div><small>σθ</small><br><input id="sigT" type="range" min="0.05" max="1.2" step="0.01" value="0.4"><div id="sigTv" class="readout">0.40</div></div>
+          <div><small>λ scale</small><br><input id="lamScale" type="range" min="0" max="3" step="0.05" value="1.0"><div id="lamSv" class="readout">1.00</div></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Satellites & Epicycle / Deferent</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <div class="small">Sat controls live in the sky: use the satellite panel to pause, add or tune satellites (beamwidth, PRF, pulse width, speed).</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="pauseSats">Pause Sats</button>
+            <button id="addSat">Add Sat</button>
+            <button id="resetSats">Reset Sats</button>
+          </div>
+          <div class="small">Epicycle factor and deferent multiplier modulate planet coil geometry (affects bounce frequency).</div>
+          <div style="display:flex;gap:8px">
+            <div><small>Deferent Mult</small><br><input id="deferentMul" type="range" min="0.6" max="1.6" step="0.05" value="1.0"><div id="deferV" class="readout">1.00</div></div>
+            <div><small>Epicycle α</small><br><input id="epicycleAlpha" type="range" min="0" max="0.5" step="0.01" value="0.12"><div id="epicV" class="readout">0.12</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Readouts -->
+    <div class="row">
+      <div class="group">
+        <label>Energy Readout (Multipole)</label>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div>∫ ρ λ ln ρ dρ dθ ≈ <span id="logInt" class="readout">0</span></div>
+          <div>Σ k [k( C₁k I₂k + S₁k J₂k )] ≈ <span id="sumInt" class="readout">0</span></div>
+          <div><b>U</b> = −Q₁/(2π ε)·(∫…) + 1/(2π ε)·(Σ…) = <span id="UVal" class="readout">0</span></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Observer & Sky</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div><small>Tilt (deg)</small><br><input id="tiltDeg" type="range" min="0" max="80" step="1" value="45"><div id="tiltV" class="readout">45°</div></div>
+          <div><small>Eye level multiplier</small><br><input id="eyeLevel" type="range" min="0.3" max="0.7" step="0.01" value="0.52"><div id="eyeV" class="readout">0.52</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">This simulation is conceptual and normalized for visualization. For real measurement, use SDR logs, precise timestamps, and instrumented sensors.</div>
+
+<script>
+/* =========================
+   Core canvas + resizing
+   ========================= */
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let W,H;
+function resize(){ W = canvas.width = Math.min(1100, window.innerWidth*0.96); H = canvas.height = Math.min(640, window.innerHeight*0.7); }
+window.addEventListener('resize', resize);
+resize();
+
+/* =========================
+   UI shortcuts
+   ========================= */
+function id(n){return document.getElementById(n)}
+const kEl=id('k'), omegaEl=id('omega'), phiEl=id('phi'), polEl=id('polarity');
+const kv=id('kv'), ov=id('ov'), phv=id('phv'), polv=id('polv');
+const mirrorEl=id('mirror'), animateBarsEl=id('animateBars');
+[kEl,omegaEl,phiEl,polEl,mirrorEl,animateBarsEl].forEach(el=>el.addEventListener('input',updateHUD));
+updateHUD();
+function updateHUD(){
+  kv.textContent = parseFloat(kEl.value).toFixed(3);
+  ov.textContent = parseFloat(omegaEl.value).toFixed(2);
+  phv.textContent = parseFloat(phiEl.value).toFixed(2);
+  polv.textContent = parseFloat(polEl.value).toFixed(2);
+  id('Q1v').textContent = id('Q1').value;
+  id('epsv').textContent = id('eps').value;
+  id('kmaxv').textContent = id('kmax').value;
+  id('rhoCv').textContent = id('rhoC').value;
+  id('thetaCv').textContent = parseFloat(id('thetaC').value).toFixed(2);
+  id('sigRv').textContent = id('sigR').value;
+  id('sigTv').textContent = parseFloat(id('sigT').value).toFixed(2);
+  id('lamSv').textContent = id('lamScale').value;
+  id('deferV').textContent = parseFloat(id('deferentMul').value).toFixed(2);
+  id('epicV').textContent = parseFloat(id('epicycleAlpha').value).toFixed(2);
+  id('tiltV').textContent = id('tiltDeg').value + '°';
+  id('eyeV').textContent = parseFloat(id('eyeLevel').value).toFixed(2);
+}
+
+/* =========================
+   Equalizer bands state
+   ========================= */
+const bands = new Array(10).fill(0).map((_,i)=>({
+  node: id('eq'+i),
+  fill: id('f'+i),
+  // transient boost (from satellites) decays with time
+  boost: 0
+}));
+
+/* =========================
+   Multipole C/S slots builder
+   ========================= */
+const multislots = id('multislots');
+let C=[], S=[];
+function buildCS(){
+  multislots.innerHTML = '';
+  const K = parseInt(id('kmax').value,10);
+  C = new Array(K).fill(0).map((_,i)=>({val:0,el:null}));
+  S = new Array(K).fill(0).map((_,i)=>({val:0,el:null}));
+  for(let k=1;k<=K;k++){
+    const wrap=document.createElement('div');
+    wrap.style.minWidth='120px';
+    wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.gap='6px';
+    const lbl=document.createElement('div'); lbl.innerHTML = `k=${k} <small style="opacity:.7">C₁k / S₁k</small>`;
+    const c=document.createElement('input'); c.type='range'; c.min='-2'; c.max='2'; c.step='0.05'; c.value = (k===1?0.6:0);
+    const s=document.createElement('input'); s.type='range'; s.min='-2'; s.max='2'; s.step='0.05'; s.value = '0.0';
+    c.addEventListener('input', ()=>C[k-1].val = parseFloat(c.value));
+    s.addEventListener('input', ()=>S[k-1].val = parseFloat(s.value));
+    C[k-1].el = c; S[k-1].el = s; C[k-1].val = parseFloat(c.value); S[k-1].val = parseFloat(s.value);
+    wrap.appendChild(lbl); wrap.appendChild(c); wrap.appendChild(s); multislots.appendChild(wrap);
+  }
+}
+buildCS();
+id('kmax').addEventListener('input', ()=>{ buildCS(); updateHUD(); });
+
+/* =========================
+   Waveform drawing & Euler overlay
+   ========================= */
+let t = 0;
+function grid(){
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  for(let y=40;y<H;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  for(let x=80;x<W;x+=80){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  ctx.restore();
+}
+
+function updateEQBars(){
+  for(let i=0;i<10;i++){
+    const base = parseFloat(bands[i].node.value)/100;
+    const pulse = animateBarsEl.checked ? 0.12*Math.max(0, Math.sin(t*0.06 + i*0.7)) : 0;
+    // add transient boost then decay
+    bands[i].boost *= 0.92;
+    const level = Math.max(0, Math.min(1, base + pulse + bands[i].boost));
+    bands[i].fill.style.height = `${Math.round(level*100)}%`;
+    bands[i].level = level;
+  }
+}
+
+function waveform(){
+  const k = parseFloat(kEl.value), omega = parseFloat(omegaEl.value), phi = parseFloat(phiEl.value), pol = parseFloat(polEl.value);
+  function signForBand(idx){
+    if (idx<=2) return lerp(0,-1,(pol+1)/2);
+    if (idx>=7) return lerp(0,1,(pol+1)/2);
+    return 1;
+  }
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#60f0ff';
+  ctx.beginPath();
+  const baseAmp = 26;
+  for(let x=0;x<W;x++){
+    let y = H/2;
+    for(let n=0;n<10;n++){
+      const A = baseAmp * bands[n].level;
+      const s = signForBand(n);
+      const harm = n+1;
+      const phase = (mirrorEl.checked ? -1 : 1) * (harm*k*x - omega*t*0.02 + phi);
+      y += s * Math.sin(phase) * A;
+    }
+    if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // bass/treble envelopes
+  ctx.strokeStyle = 'rgba(86,211,100,0.45)'; ctx.lineWidth=1.2; ctx.beginPath();
+  for(let x=0;x<W;x++){ const y = H/2 + Math.sin(0.3*k*x - omega*t*0.02) * 10 * (pol < 0 ? Math.abs(pol) : 0); if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke();
+  ctx.strokeStyle='rgba(96,168,255,0.45)'; ctx.beginPath();
+  for(let x=0;x<W;x++){ const y = H/2 + Math.sin(2.0*k*x - omega*t*0.02) * 8 * (pol > 0 ? Math.abs(pol) : 0); if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke();
+
+  // Euler overlay
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = '700 14px ui-monospace, Menlo, Consolas';
+  ctx.fillText('e^{iθ} = cos θ + i sin θ', W-300, 28);
+
+  ctx.restore();
+}
+
+/* =========================
+   Spiral octaves / planet markers (conceptual)
+   ========================= */
+const PLANETS = [
+  {name:'Mercury', period:87.969, color:'#ffdf6e'},
+  {name:'Venus', period:224.701, color:'#ffc17a'},
+  {name:'Earth', period:365.256, color:'#8fd3ff'},
+  {name:'Mars', period:686.980, color:'#ff8f7b'},
+  {name:'Jupiter', period:4332.589, color:'#ffd59e'},
+  {name:'Saturn', period:10759.22, color:'#e6d4a6'}
+];
+PLANETS.forEach(p=>p.f=1.0/p.period);
+
+function drawSpiralOctaves(){
+  const panelTop = H*0.5;
+  const panelHeight = H - panelTop;
+  const cx = W*0.5, cy = panelTop + panelHeight*0.52;
+  const rMax = Math.min(W, panelHeight)*0.42;
+  const rMin = rMax*0.08;
+  const turns = parseInt(id('kmax').value,10);
+  const thetaMax = turns * Math.PI*2;
+  const steps = 700;
+
+  // spiral curve
+  ctx.save();
+  ctx.beginPath();
+  for(let i=0;i<=steps;i++){
+    const th = i/steps * thetaMax;
+    const scale = Math.pow(2, th / (2*Math.PI));
+    const r = rMin + (rMax - rMin) * ((scale - 1) / (Math.pow(2, turns) - 1));
+    const x = cx + r * Math.cos(th + t*0.05);
+    const y = cy + r * Math.sin(th + t*0.05);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle = 'rgba(246,201,69,0.9)'; ctx.lineWidth = 2; ctx.stroke();
+
+  // planets (as conceptual orbital dots with epicycle)
+  const deferMul = parseFloat(id('deferentMul').value);
+  const alpha = parseFloat(id('epicycleAlpha').value);
+  for(let idx=0; idx<PLANETS.length; idx++){
+    const p = PLANETS[idx];
+    const r = mapFreqToRadius(p.f, rMin*1.02, rMax*0.96) * deferMul;
+    const omega = (p.f) * 120; // visual speed
+    const ang = t*0.02*(omega/60) + idx*0.6;
+    // epicycle
+    const ex = r * Math.cos(ang);
+    const ey = r * Math.sin(ang);
+    const rho_e = alpha * r;
+    const subAng = t*0.06*(omega/60) * (1 + idx*0.2);
+    const x = cx + ex + rho_e * Math.cos(subAng);
+    const y = cy + ey + rho_e * Math.sin(subAng);
+
+    // trail
+    ctx.beginPath(); ctx.strokeStyle = p.color + '66'; ctx.lineWidth=1;
+    for(let m=0;m<30;m++){
+      const tt = t - m*2;
+      const ang2 = tt*0.02*(omega/60) + idx*0.6;
+      const ex2 = r * Math.cos(ang2);
+      const ey2 = r * Math.sin(ang2);
+      const subAng2 = tt*0.06*(omega/60) * (1+idx*0.2);
+      const x2 = cx + ex2 + rho_e * Math.cos(subAng2);
+      const y2 = cy + ey2 + rho_e * Math.sin(subAng2);
+      if(m===0) ctx.moveTo(x2,y2); else ctx.lineTo(x2,y2);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(x,y,5 + idx*0.6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='600 11px system-ui'; ctx.fillText(p.name, x+8, y-6);
+  }
+  ctx.restore();
+}
+
+function mapFreqToRadius(f, rMin, rMax){
+  const fmin = Math.min(...PLANETS.map(p=>p.f));
+  const fmax = Math.max(...PLANETS.map(p=>p.f));
+  const nf = (Math.sqrt(f) - Math.sqrt(fmin)) / (Math.sqrt(fmax) - Math.sqrt(fmin) + 1e-6);
+  return rMin + nf * (rMax - rMin);
+}
+
+/* =========================
+   Cylindrical multipole integration (numerical)
+   ========================= */
+function wrapAngle(a){ a = (a + Math.PI) % (2*Math.PI); if(a<0) a+=2*Math.PI; return a - Math.PI; }
+function lambda(r, th){
+  const rc = parseFloat(id('rhoC').value), tc = parseFloat(id('thetaC').value);
+  const sr = parseFloat(id('sigR').value), st = parseFloat(id('sigT').value), L0 = parseFloat(id('lamScale').value);
+  const dth = wrapAngle(th - tc);
+  const pr = Math.exp(-(r-rc)*(r-rc)/(2*sr*sr));
+  const pt = Math.exp(-(dth*dth)/(2*st*st));
+  return L0 * pr * pt;
+}
+
+function integrateMultipoles(){
+  const K = parseInt(id('kmax').value,10);
+  const rMax = Math.min(W,H)/2 - 6;
+  const Nr = 110, Nt = 160;
+  const dr = rMax / Nr, dth = 2*Math.PI / Nt;
+  let Llog = 0;
+  const I = new Array(K).fill(0), J = new Array(K).fill(0);
+  for(let ir=1; ir<=Nr; ir++){
+    const r = ir*dr;
+    const lamr = new Array(Nt);
+    for(let it=0; it<Nt; it++){
+      const th = -Math.PI + it*dth;
+      const lam = lambda(r, th);
+      lamr[it] = lam;
+      Llog += r * lam * Math.log(r+1e-9) * dr * dth;
+    }
+    for(let k=1;k<=K;k++){
+      let iSum=0, jSum=0;
+      for(let it=0;it<Nt;it++){
+        const th = -Math.PI + it*dth;
+        const lam = lamr[it];
+        iSum += Math.pow(r, k) * Math.cos(k*th) * lam * r * dth;
+        jSum += Math.pow(r, k) * Math.sin(k*th) * lam * r * dth;
+      }
+      I[k-1] += iSum * dr; J[k-1] += jSum * dr;
+    }
+  }
+  return {Llog, I, J};
+}
+
+/* =========================
+   Satellite module integrated
+   ========================= */
+let SATS = [
+  {name:'Sat-A', pathType:'linear', x0:-200, y0:80, vx:0.9, vy:0.02, txFreqHz:1.6e9, txPower:1.0, pulseMs:80, prfHz:2, beamDeg:12, showBeam:true},
+  {name:'Sat-B', pathType:'linear', x0:W+200, y0:30, vx:-1.05, vy:0.04, txFreqHz:2.4e9, txPower:0.9, pulseMs:40, prfHz:6, beamDeg:18, showBeam:true}
+];
+let satsPaused = false;
+const msPerFrame = 16.67;
+
+function resetSats(){
+  SATS = [
+    {name:'Sat-A', pathType:'linear', x0:-200, y0:80, vx:0.9, vy:0.02, txFreqHz:1.6e9, txPower:1.0, pulseMs:80, prfHz:2, beamDeg:12, showBeam:true},
+    {name:'Sat-B', pathType:'linear', x0:W+200, y0:30, vx:-1.05, vy:0.04, txFreqHz:2.4e9, txPower:0.9, pulseMs:40, prfHz:6, beamDeg:18, showBeam:true}
+  ];
+}
+
+id('pauseSats').addEventListener('click', ()=>{ satsPaused = !satsPaused; id('pauseSats').textContent = satsPaused ? 'Resume Sats' : 'Pause Sats'; });
+id('resetSats').addEventListener('click', ()=>{ resetSats(); });
+id('addSat').addEventListener('click', ()=>{
+  const n = SATS.length+1;
+  SATS.push({name:'Sat-'+n, pathType:'linear', x0: Math.random()*W, y0: Math.random()*H*0.6, vx:(Math.random()*2-1), vy:(Math.random()*0.1-0.05), txFreqHz:1.6e9+Math.random()*1e9, txPower:0.5+Math.random()*0.8, pulseMs:20+Math.random()*120, prfHz:1+Math.random()*10, beamDeg:8+Math.random()*22, showBeam:true});
+});
+
+function clamp(x,a,b){ return Math.max(a,Math.min(b,x)); }
+
+// Update/render sats; returns contributions: {band, amplitude, doppler}
+function updateAndRenderSatellites(ctx, frameT, W, H, observer){
+  const contribs = [];
+  const now = frameT;
+  const obsX = observer.x, obsY = observer.y;
+  SATS.forEach((sat, idx)=>{
+    // update pos
+    if(sat.pathType === 'linear'){
+      if(sat.x0 === undefined){ sat.x0 = sat.x || (Math.random()*W); sat.y0 = sat.y || (Math.random()*H*0.3); }
+      if(!satsPaused){ sat.x = sat.x0 + sat.vx * now; sat.y = sat.y0 + sat.vy * now; }
+    } else if(sat.pathType === 'circular'){
+      const omega = sat.omega || 0.001*(idx+1);
+      const r = sat.r || Math.min(W,H)*0.25;
+      const cx = W/2, cy = H*0.33;
+      sat.x = cx + r * Math.cos(omega * now + (sat.phase||0));
+      sat.y = cy + r * Math.sin(omega * now + (sat.phase||0));
+    }
+
+    // compute LOS & heading
+    const dx = obsX - sat.x, dy = obsY - sat.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) + 1e-6;
+    const angToObs = Math.atan2(dy, dx) * 180 / Math.PI;
+    const satHeading = Math.atan2(sat.vy||0.0001, sat.vx||0.0001) * 180/Math.PI;
+    let offAxis = Math.abs(((angToObs - satHeading + 540) % 360) - 180);
+    const inBeam = (offAxis <= sat.beamDeg);
+
+    // pulse timing
+    const tms = now * msPerFrame;
+    const prf = sat.prfHz;
+    const pulsePeriodMs = 1000 / Math.max(0.0001, prf);
+    const phase = tms % pulsePeriodMs;
+    const pulsing = (phase < sat.pulseMs);
+
+    // relative LOS velocity estimate (px/frame)
+    const relV = ((sat.vx||0) - 0) * (dx/dist) + ((sat.vy||0) - 0) * (dy/dist);
+    const dopplerHz = sat.txFreqHz * (relV * 0.001);
+
+    // compute amplitude if in beam & pulsing
+    let amp = 0;
+    if(inBeam && pulsing){
+      const attenuation = 1 / (1 + 0.0006 * dist * dist);
+      amp = sat.txPower * attenuation;
+      // map to bands: use toy mapping to spread to 3 bands around center
+      const baseBand = Math.floor(((sat.txFreqHz % 1e9) / 1e9) * 10);
+      const bandsAffected = [ clamp(baseBand,0,9), clamp(baseBand-1,0,9), clamp(baseBand+1,0,9) ];
+      [0,1,2].forEach((i)=>{ const b = bandsAffected[i]; const weight = [0.6,0.25,0.15][i]; contribs.push({band:b, amplitude: amp*weight, doppler: dopplerHz}); });
+    }
+
+    // draw beam wedge & sat icon
+    ctx.save();
+    if(sat.showBeam){
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(100,160,255,${0.06 + Math.min(0.35, amp)})`;
+      const headingRad = satHeading * Math.PI/180;
+      const bw = sat.beamDeg * Math.PI/180;
+      const beamDist = Math.min(W,H)*0.9;
+      const x1 = sat.x + Math.cos(headingRad - bw) * beamDist;
+      const y1 = sat.y + Math.sin(headingRad - bw) * beamDist;
+      const x2 = sat.x + Math.cos(headingRad + bw) * beamDist;
+      const y2 = sat.y + Math.sin(headingRad + bw) * beamDist;
+      ctx.moveTo(sat.x, sat.y); ctx.lineTo(x1,y1); ctx.lineTo(x2,y2); ctx.closePath(); ctx.fill();
+    }
+    // sat body
+    ctx.beginPath(); ctx.fillStyle = 'rgba(210,220,255,0.95)'; ctx.arc(sat.x, sat.y, 4.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='11px system-ui'; ctx.fillText(sat.name, sat.x+8, sat.y-6);
+    ctx.restore();
+
+    // observer glow if hit
+    if(inBeam && pulsing && amp>0.002){
+      ctx.save();
+      ctx.beginPath(); ctx.fillStyle = `rgba(255,220,100,${Math.min(0.32, amp*1.8)})`; ctx.arc(obsX, obsY, 16 + 120*amp, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    }
+  });
+  return contribs;
+}
+
+/* =========================
+   Integration: satellite contributions -> boost bands
+   ========================= */
+function applyContribs(contribs){
+  contribs.forEach(c=>{
+    const idx = c.band;
+    if(idx>=0 && idx<bands.length){
+      bands[idx].boost += c.amplitude * 0.8; // temporary boost
+      // also slightly nudge neighbors
+      if(idx>0) bands[idx-1].boost += c.amplitude * 0.25;
+      if(idx<bands.length-1) bands[idx+1].boost += c.amplitude * 0.15;
+    }
+  });
+}
+
+/* =========================
+   Multipole energy periodic compute + display
+   ========================= */
+const logIntEl = id('logInt'), sumIntEl = id('sumInt'), UEl = id('UVal');
+function computeAndDisplayMultipoles(){
+  const {Llog,I,J} = integrateMultipoles();
+  const Q1 = parseFloat(id('Q1').value), eps = parseFloat(id('eps').value), K = parseInt(id('kmax').value,10);
+  let sum = 0;
+  for(let k=1;k<=K;k++){
+    const Ck = (C[k-1]?.val)||0, Sk = (S[k-1]?.val)||0;
+    sum += k*(Ck*I[k-1] + Sk*J[k-1]);
+  }
+  const U = (-Q1/(2*Math.PI*eps))*Llog + (1/(2*Math.PI*eps))*sum;
+  logIntEl.textContent = Llog.toFixed(3);
+  sumIntEl.textContent = sum.toFixed(3);
+  UEl.textContent = U.toFixed(3);
+}
+
+/* =========================
+   Tilted horizon + "basketball" planet motion (eye-level)
+   ========================= */
+function rot2D(x,y,cx,cy,ang){ const dx=x-cx, dy=y-cy, ca=Math.cos(ang), sa=Math.sin(ang); return {x:cx + dx*ca - dy*sa, y: cy + dx*sa + dy*ca}; }
+
+function drawTiltedSky(frameT){
+  const tiltDeg = parseFloat(id('tiltDeg').value);
+  const tilt = tiltDeg * Math.PI/180;
+  const cx = W/2, cy = H/2;
+  const L = Math.hypot(W,H);
+  const p1 = rot2D(cx-L, cy, cx, cy, tilt), p2 = rot2D(cx+L, cy, cx, cy, tilt);
+  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.32)'; ctx.lineWidth=2; ctx.setLineDash([10,8]); ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+  // eye level mark
+  const eyeY = H * parseFloat(id('eyeLevel').value);
+  const eyeMark = rot2D(cx, eyeY, cx, cy, tilt);
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='600 12px system-ui'; ctx.fillText('eye level (tilted)', eyeMark.x+10, eyeMark.y-8);
+
+  // show a few band-driven planets as basketballs
+  for(let b=0;b<10; b+=3){
+    const st = planetState(b, frameT);
+    const pr = rot2D(st.x, st.y, cx, cy, tilt);
+    // trail
+    ctx.beginPath(); ctx.strokeStyle='rgba(96,168,255,0.8)'; ctx.lineWidth=1.2;
+    for(let k=0;k<80;k+=8){
+      const tt = frameT - k;
+      const s2 = planetState(b, tt);
+      const p2 = rot2D(s2.x, s2.y, cx, cy, tilt);
+      if(k===0) ctx.moveTo(p2.x,p2.y); else ctx.lineTo(p2.x,p2.y);
+    }
+    ctx.stroke();
+    // ball
+    ctx.fillStyle='rgba(96,168,255,0.92)'; ctx.beginPath(); ctx.arc(pr.x, pr.y, 6 + 2*b/3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(230,230,230,0.95)'; ctx.font='600 11px system-ui'; ctx.fillText(`band ${b+1} | f=${st.f.toFixed(2)}Hz`, pr.x+10, pr.y-10);
+  }
+}
+
+function planetState(bandIndex, frameT){
+  const u = 0.9 + 0.25*bandIndex;
+  const f = 0.05 + 0.45 * bands[bandIndex].level;
+  const phi = bandIndex * 0.7;
+  const y_eye = H * parseFloat(id('eyeLevel').value);
+  const R = 60 + bandIndex*26;
+  const A_ring = 2*Math.PI*R*18;
+  const A0 = 28, beta = 1.2e-3;
+  const Aamp = A0 / (1 + beta*A_ring);
+  const x0 = ((u*frameT) % (W+300)) - 150;
+  const y0 = y_eye + Aamp * Math.sin(2*Math.PI*f*(frameT*0.02) + phi);
+  return {x:x0, y:y0, f:Aamp>0?f:0, Aamp};
+}
+
+/* =========================
+   Main animation loop
+   ========================= */
+let frame = 0;
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(0,0,W,H);
+  grid();
+  updateEQBars();
+  waveform();
+  drawSpiralOctaves();
+
+  // observer position for sats (eye-level center)
+  const observer = {x: W/2, y: H * parseFloat(id('eyeLevel').value)};
+  const satContribs = updateAndRenderSatellites(ctx, frame, W, H, observer);
+  applyContribs(satContribs);
+
+  drawTiltedSky(frame);
+
+  // multipole compute occasionally
+  if(frame % 8 === 0) computeAndDisplayMultipoles();
+
+  // HUD
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='600 12px system-ui';
+  ctx.fillText(`Time: ${(frame*0.016).toFixed(2)}s`, W-150, 24);
+  ctx.restore();
+
+  frame++; t++;
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* =========================
+   UI wiring for controls + events
+   ========================= */
+id('deferentMul').addEventListener('input', updateHUD);
+id('epicycleAlpha').addEventListener('input', updateHUD);
+id('tiltDeg').addEventListener('input', updateHUD);
+id('eyeLevel').addEventListener('input', updateHUD);
+
+id('Q1').addEventListener('input', updateHUD);
+id('eps').addEventListener('input', updateHUD);
+id('rhoC').addEventListener('input', updateHUD);
+id('thetaC').addEventListener('input', updateHUD);
+id('sigR').addEventListener('input', updateHUD);
+id('sigT').addEventListener('input', updateHUD);
+id('lamScale').addEventListener('input', updateHUD);
+
+/* helper lerp */
+function lerp(a,b,u){ return a + (b-a)*u }
+</script>
+</body>
+</html>
